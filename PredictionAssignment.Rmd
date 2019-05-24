@@ -1,0 +1,133 @@
+---
+title: "Prediction Assignment"
+author: "Aaron Bench"
+date: "May 14, 2019"
+output: html_document
+---
+```{r setup, include=TRUE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(caret)
+library(rpart)
+library(rpart.plot)
+```
+##Executive Summary
+Wearable Fitness tracking devices have become increasingly more accurate and popular over the last decade.  This study uses data from accelerometers on the belt, forearm, arm and dumbell of six participants who were asked to perform a series of tasks correctly and incorrectly in five different ways.  This study looks at how accuratly we can predict the manner in which the participants performed the exercise. 
+
+
+## Data Ingest
+
+```{r, echo=TRUE}
+setwd("C:/Users/aaron/OneDrive/Documents/Data_Science")
+#Ingest data
+
+pml_training <- read.csv("pml-training.csv")
+
+pml_testing <- read.csv("pml-testing.csv")
+
+```
+
+
+## Data Cleansing
+
+Remove NA values and vectors that are not in the testing sample.
+```{r clean, echo=TRUE}
+V <- names(pml_testing[,colSums(is.na(pml_testing)) == 0])[8:59] #variable list to Keep  variable columns from pml_testing without NAs from columns 8:59
+
+pml_training <- pml_training[,c(V, "classe")]
+
+pml_testing <- pml_testing[, c(V, "problem_id")]
+
+head(pml_testing)
+head(pml_training)
+
+#Now we have the same number of vectors for each data frame
+
+```
+
+## Split the data
+Next, we need to split our training data set.  We'll split the training data set by 60% for training and 40% for testing.
+
+```{r training split, echo=TRUE}
+
+
+set.seed(1234)
+part_train <- caret::createDataPartition(pml_training$classe, p=0.06, list=FALSE) #Randomly part data
+
+training_df <- pml_training[part_train,] #Assign the 60% parted data 
+
+training_test_df <- pml_training[-part_train,] #assign the rest (40%) for testing.  Not to be confused with the separate model test data
+
+```
+
+#Machine learning models
+
+##Random Forest
+I understand from class that the random forest model will almost always be better than a decision tree because it essentially does a variety of decision trees with random subsets of the data.  I will proceed with a Random Forest model.
+
+```{r RF, echo=TRUE}
+
+RF <- caret::train(classe ~., method='rf', data=training_df, ntree=128) #A google search told me 128 is the max optimal number of trees
+
+RF_PREDICT <- stats::predict(RF, training_test_df) #STATS from base R
+
+RF_Conf <- caret::confusionMatrix(training_test_df$classe, RF_PREDICT)
+
+RF_Conf
+
+
+```
+We get 94% accuracy with the Random Forest model.  Next, I'll compare it to the Gradient Boosting Model.
+
+##Gradient Boosting Model (GBM)
+
+```{r GBM, echo=TRUE}
+
+GBM <- caret::train(classe ~., method='gbm', data=training_df, verbose=FALSE)
+
+GBM_PREDICT <- stats::predict(GBM, training_test_df)
+
+GBM_Conf <- caret::confusionMatrix(training_test_df$classe, GBM_PREDICT)
+GBM_Conf
+```
+##Comparison Summary of Random Forest Vs. Gradient Boosting 
+
+
+```{r GBM vs RF, echo=TRUE}
+
+plot(GBM_Conf$table, col = GBM_Conf$byClass, 
+     main = paste("Gradient Boosting - Accuracy Level =",
+                  round(GBM_Conf$overall['Accuracy'], 4)))
+
+plot(RF_Conf$table, col = RF_Conf$byClass, 
+     main = paste("Random Forest - Accuracy Level =",
+                  round(RF_Conf$overall['Accuracy'], 4)))
+
+
+
+
+```
+
+
+##Conclusion
+
+The Random Forest model appears to be slightly stronger than the Gradient Boosting Model.  The Random Forest model predicts Classe with nearly 94% accuracy in my training data set when splitting the training set data 60% train and 40% test.  
+
+#Prediction on Testing data set
+
+
+```{r predict on test data, echo=TRUE}
+RF_predictOnTest <- stats::predict(RF, pml_testing)
+
+RF_predictOnTest
+```
+
+
+
+
+
+
